@@ -1,0 +1,195 @@
+kfold for regression
+def KF_Analysis(feat, lab, db):
+    # kfold values
+    kr = [2, 4, 6, 8, 10]
+    # No.of Iterations
+    epochs = [20, 40, 60, 80, 100]
+    comp_1, comp_2, comp_3, comp_4, comp_5, comp_6, comp_7, comp_8, comp_9, comp_10, comp_11, comp_12 = [[] for _ in
+                                                                                                         range(12)]
+    comp = [comp_1, comp_2, comp_3, comp_4, comp_5, comp_6, comp_7, comp_8, comp_9, comp_10, comp_11, comp_12]
+    perf_names = ["MAE", 'MSE', 'RMSE', 'R2']
+    for w in range(len(kr)):
+        kr[w] = 2
+        print(colored(str(kr[w]) + " --- Fold", color='magenta'))
+        from sklearn.model_selection import KFold
+        k_folds = kr[w]
+        kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
+
+        comp_01, comp_02, comp_03, comp_04, comp_05, comp_06, comp_07, comp_08, comp_09, comp_010, comp_011, comp_012 = \
+            [[] for _ in range(12)]
+        for train, test in kf.split(feat):
+            X1_train, X1_test = feat[train], feat[test]
+            ytrain, ytest = lab[train], lab[test]
+
+            X1_train[X1_train > 1e308] = 0
+            X1_test[X1_test > 1e308] = 0
+
+            # Normalizing X_train & X_test
+            X_train = X1_train.astype(np.float32) / X1_train.max()
+            X_test = X1_test.astype(np.float32) / X1_test.max()
+
+            ytrue1, pred1 = linear_regression(X_train, ytrain, X_test, ytest)
+            ytrue2, pred2 = CNN(X_train, ytrain, X_test, ytest, epochs[4])
+            ytrue3, pred3 = LSTM_model(X_train, ytrain, X_test, ytest, epochs[4])
+            ytrue4, pred4 = BILSTM(X_train, ytrain, X_test, ytest, epochs[4])
+            ytrue5, pred5 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[4], opt=0)
+            ytrue6, pred6 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[4], opt=1)
+            ytrue7, pred7 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[4], opt=2)
+
+            ytrue8, pred8 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[0], opt=3)
+            ytrue9, pred9 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[1], opt=3)
+            ytrue10, pred10 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[2], opt=3)
+            ytrue11, pred11 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[3], opt=3)
+            ytrue12, pred12 = Hybrid_DCNN_RNN(X_train, ytrain, X_test, ytest, epochs[4], opt=3)
+
+            # Evaluating the Metrics
+            comp_01.append(main_est_perf_metrics(ytrue1, pred1))
+            comp_02.append(main_est_perf_metrics(ytrue2, pred2))
+            comp_03.append(main_est_perf_metrics(ytrue3, pred3))
+            comp_04.append(main_est_perf_metrics(ytrue4, pred4))
+            comp_05.append(main_est_perf_metrics(ytrue5, pred5))
+            comp_06.append(main_est_perf_metrics(ytrue6, pred6))
+            comp_07.append(main_est_perf_metrics(ytrue7, pred7))
+            comp_08.append(main_est_perf_metrics(ytrue8, pred8))
+            comp_09.append(main_est_perf_metrics(ytrue9, pred9))
+            comp_010.append(main_est_perf_metrics(ytrue10, pred10))
+            comp_011.append(main_est_perf_metrics(ytrue11, pred11))
+            comp_012.append(main_est_perf_metrics(ytrue12, pred12))
+
+        comp01 = [comp_01, comp_02, comp_03, comp_04, comp_05, comp_06, comp_07, comp_08, comp_09, comp_010, comp_011,
+                  comp_012]
+
+        for m in range(len(comp01)):
+            new = []
+            for n in range(0, len(perf_names)):
+                x = [separate[n] for separate in comp01[m]]
+                x = np.mean(x)
+                new.append(x)
+            comp[m].append(new)
+
+    file_names = [f'Analysis\\{db}\\{name}_2.npy' for name in perf_names]
+    for j in range(0, len(perf_names)):
+        new = []
+        for i in range(len(comp)):
+            x = [separate[j] for separate in comp[i]]
+            new.append(x)
+        np.save(file_names[j], new)
+
+On Sat, 24 May 2025 at 13:31, Rpinnacle Programmer-3 <rpd003.research@gmail.com> wrote:
+def mean_parameter(acc, sen, spe):
+    acc = np.mean(acc)
+    sen = np.mean(sen)
+    spe = np.mean(spe)
+    return acc, sen, spe
+
+On Sat, 24 May 2025 at 13:26, Rpinnacle Programmer-3 <rpd003.research@gmail.com> wrote:
+
+def KF_Analysis(feat, label, n):
+    """K-fold cross-validation approach divides the input dataset into K groups of samples of equal sizes.
+    These samples are called folds. For each learning set, the prediction function uses k-1 folds,
+    and the rest of the folds are used for the test set. This approach is a very popular CV approach
+    because it is easy to understand, and the output is less biased than other methods."""
+
+    # oversample = SMOTE()  # Apply Smote technique
+    # feat, label = oversample.fit_resample(feat, label)
+    feat = np.nan_to_num(feat, 0)
+    label = label
+
+    kr = [6, 7, 8, 9, 10]
+    epochs = [20, 40, 60, 80, 100]  # no of iteration
+    opt = [0, 1, 2, 3, 4]
+    tr = kr
+    ACC, SEN, SPE = np.zeros((14, len(tr))), np.zeros((14, len(tr))), np.zeros((14, len(tr)))
+    for w in range(len(kr)):
+        i = w
+        print(kr[w])
+        from sklearn import preprocessing
+        from ReliefF import ReliefF
+        fs = ReliefF(n_neighbors=20, n_features_to_keep=500)
+        # split Features and labels into Train and Test sets
+        strtfdKFold = StratifiedKFold(n_splits=kr[w])
+        kfold = strtfdKFold.split(feat, label)
+        ACC1, SEN1, SPE1 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC2, SEN2, SPE2 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC3, SEN3, SPE3 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC4, SEN4, SPE4 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC5, SEN5, SPE5 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC6, SEN6, SPE6 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC7, SEN7, SPE7 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC8, SEN8, SPE8 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC9, SEN9, SPE9 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC10, SEN10, SPE10 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC11, SEN11, SPE11 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC12, SEN12, SPE12 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC13, SEN13, SPE13 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+        ACC14, SEN14, SPE14 = np.zeros((1, kr[w])), np.zeros((1, kr[w])), np.zeros((1, kr[w]))
+
+        for k, (train, test) in enumerate(kfold):
+            if k == 0 or k == 1:
+                tr_data = feat[train, :]
+                tr_data = tr_data[:, :]
+                y_train = label[train]
+                tst_data = feat[test, :]
+                tst_data = tst_data[:, :]
+                y_test = label[test]
+                X_train = tr_data
+                X_test = tst_data
+
+                X_train[X_train > 1e308] = 0
+                X_test[X_test > 1e308] = 0
+
+
+                # Convert into Hot Vector
+                y1_train = keras.utils.to_categorical(y_train)
+                y1_test = keras.utils.to_categorical(y_test)
+
+                pred_1, y_test_1 = SVC_classifier(X_train, y_train, X_test, y_test)  # SVC
+                pred_2, y_test_2 = DT_classifier(X_train, y_train, X_test, y_test)  # RF
+                pred_3, y_test_3 = NB(X_train, y_train, X_test, y_test)  # NB
+                pred_4, y_test_4 = ANN_model(X_train, y1_train, X_test, y1_test, epochs[4])  # ANN
+                pred_5, y_test_5 = DeepCNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[0])  # DeepCNN
+                pred_6, y_test_6 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[0])  # ElmanNN
+                pred_7, y_test_7 = DeepCNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[1])  # BEO Optimization
+                pred_8, y_test_8 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[1])  # PSO Optimization
+                pred_9, y_test_9 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[2])  # CRO Optimization
+                ## Performance
+                pred_10, y_test_10 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[0], opt[3])  # Prop
+                pred_11, y_test_11 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[1], opt[3])  # Prop
+                pred_12, y_test_12 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[2], opt[3])  # Prop
+                pred_13, y_test_13 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[3], opt[3])  # Prop
+                pred_14, y_test_14 = ElmanNN(X_train, y1_train, X_test, y1_test, epochs[4], opt[3])  # Prop
+
+                # Following function is used to evaluate metrics accuracy, sensitivity, specificity
+                ACC1[0, k], SEN1[0, k], SPE1[0, k] = main_est_perf_metrics(pred_1, y_test_1)
+                ACC2[0, k], SEN2[0, k], SPE2[0, k] = main_est_perf_metrics(pred_2, y_test_2)
+                ACC3[0, k], SEN3[0, k], SPE3[0, k] = main_est_perf_metrics(pred_3, y_test_3)
+                ACC4[0, k], SEN4[0, k], SPE4[0, k] = main_est_perf_metrics(pred_4, y_test_4)
+                ACC5[0, k], SEN5[0, k], SPE5[0, k] = main_est_perf_metrics(pred_5, y_test_5)
+                ACC6[0, k], SEN6[0, k], SPE6[0, k] = main_est_perf_metrics(pred_6, y_test_6)
+                ACC7[0, k], SEN7[0, k], SPE7[0, k] = main_est_perf_metrics(pred_7, y_test_7)
+                ACC8[0, k], SEN8[0, k], SPE8[0, k] = main_est_perf_metrics(pred_8, y_test_8)
+                ACC9[0, k], SEN9[0, k], SPE9[0, k] = main_est_perf_metrics(pred_9, y_test_9)
+                ACC10[0, k], SEN10[0, k], SPE10[0, k] = main_est_perf_metrics(pred_10, y_test_10)
+                ACC11[0, k], SEN11[0, k], SPE11[0, k] = main_est_perf_metrics(pred_11, y_test_11)
+                ACC12[0, k], SEN12[0, k], SPE12[0, k] = main_est_perf_metrics(pred_12, y_test_12)
+                ACC13[0, k], SEN13[0, k], SPE13[0, k] = main_est_perf_metrics(pred_13, y_test_13)
+                ACC14[0, k], SEN14[0, k], SPE14[0, k] = main_est_perf_metrics(pred_14, y_test_14)
+
+        ACC[0, i], SEN[0, i], SPE[0, i] = mean_parameter(ACC1, SEN1, SPE1)
+        ACC[1, i], SEN[1, i], SPE[1, i] = mean_parameter(ACC2, SEN2, SPE2)
+        ACC[2, i], SEN[2, i], SPE[2, i] = mean_parameter(ACC3, SEN3, SPE3)
+        ACC[3, i], SEN[3, i], SPE[3, i] = mean_parameter(ACC4, SEN4, SPE4)
+        ACC[4, i], SEN[4, i], SPE[4, i] = mean_parameter(ACC5, SEN5, SPE5)
+        ACC[5, i], SEN[5, i], SPE[5, i] = mean_parameter(ACC6, SEN6, SPE6)
+        ACC[6, i], SEN[6, i], SPE[5, i] = mean_parameter(ACC7, SEN7, SPE7)
+        ACC[7, i], SEN[7, i], SPE[7, i] = mean_parameter(ACC8, SEN8, SPE8)
+        ACC[8, i], SEN[8, i], SPE[8, i] = mean_parameter(ACC9, SEN9, SPE9)
+        ACC[9, i], SEN[9, i], SPE[9, i] = mean_parameter(ACC10, SEN10, SPE10)
+        ACC[10, i], SEN[10, i], SPE[10, i] = mean_parameter(ACC11, SEN11, SPE11)
+        ACC[11, i], SEN[11, i], SPE[11, i] = mean_parameter(ACC12, SEN12, SPE12)
+        ACC[12, i], SEN[12, i], SPE[12, i] = mean_parameter(ACC13, SEN13, SPE13)
+        ACC[13, i], SEN[13, i], SPE[13, i] = mean_parameter(ACC14, SEN14, SPE14)
+
+    np.save("Accuracy.npy" + str(n + 3) + ".npy", ACC)
+    np.save("Sensitivity.npy" + str(n + 3) + ".npy", SEN)
+    np.save("Specificity.npy" + str(n + 3) + ".npy", SPE)

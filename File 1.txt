@@ -1,0 +1,311 @@
+def main_est_parameters(y_true, pred):
+    """
+    :param y_true: true labels
+    :param pred: predicted labels
+    :return: performance metrics in list dtype
+    """
+    cm = multilabel_confusion_matrix(y_true, pred)
+    cm = sum(cm)
+    TP = cm[0, 0]  # True Positive
+    FP = cm[0, 1]  # False Positive
+    FN = cm[1, 0]  # False Negative
+    TN = cm[1, 1]  # True Negative
+    Acc = (TP + TN) / (TP + TN + FP + FN)
+    Sen = TP / (TP + FN)
+    Spe = TN / (TN + FP)
+    Pre = TP / (TP + FP)
+    Rec = TP / (TP + FN)
+    F1score = 2 * (Pre * Rec) / (Pre + Rec)
+    TPR = TP / (TP + FN)
+    FPR = FP / (FP + TN)
+    return [Acc, Sen, Spe, F1score, Pre, Rec, TPR, FPR]
+
+
+def train_test_split(feat, lab, percent):
+    xtrain, xtest, ytrain, ytest = [], [], [], []
+    all = np.unique(lab)
+    for i in all:
+        index = np.where(i == lab)[0]
+        div = int(index.shape[0] * percent)
+        x_train = feat[index[:div], :]
+        x_test = feat[index[div:], :]
+        y_train = lab[index[:div]]
+        y_test = lab[index[div:]]
+        xtrain.append(x_train), xtest.append(x_test), ytrain.append(y_train), ytest.append(y_test)
+
+    xtrain = np.vstack(xtrain)
+    xtest = np.vstack(xtest)
+    ytrain = np.hstack(ytrain)
+    ytest = np.hstack(ytest)
+    perm = np.random.permutation(len(xtrain))
+    xtrain = xtrain[perm]
+    ytrain = ytrain[perm]
+    return xtrain, xtest, ytrain, ytest
+class Comparatives:
+    def __init__(self, xtrain, ytrain, xtest, ytest):
+        self.xtrain = xtrain
+        self.ytrain = ytrain
+        self.xtest = xtest
+        self.ytest = ytest
+        self.epochs = 4
+
+    def SkipGateNet(self):
+        """
+        :return: evaluated metrics
+        """
+        cprint("SkipGateNet >> ", color='blue', on_color='on_grey')
+        xtrain = np.expand_dims(self.xtrain, axis=1)
+        xtest = np.expand_dims(self.xtest, axis=1)
+        inputs = Input(shape=(xtrain.shape[1:]))
+        x = Conv1D(filters=64, kernel_size=3, activation='relu', padding='same')(inputs)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(1)(x)
+
+        x = LSTM(8, activation='relu', return_sequences=False)(x)
+        # Dense output layer
+        outputs = Dense(self.ytrain.shape[1], activation='softmax')(x)
+        # Compile the Model
+        model = Model(inputs, outputs)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        # Train the Model
+        model.fit(xtrain, self.ytrain, epochs=self.epochs, batch_size=8)
+        # Predict and evaluate
+        preds = model.predict(xtest)
+        pred = np.argmax(preds, axis=1)
+        metrics = main_est_parameters(self.ytest, pred)
+        return metrics
+
+    def ACLR_(self):
+        cprint("ACLR >> ", color='blue', on_color='on_grey')
+        xtrain = np.expand_dims(self.xtrain, axis=1)
+        xtest = np.expand_dims(self.xtest, axis=1)
+        inputs = Input(shape=(xtrain.shape[1:]))
+        x = Conv1D(filters=32, kernel_size=3, activation='relu', padding='same')(inputs)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(1)(x)
+        x = SimpleRNN(64, activation='relu', return_sequences=True)(x)
+        x = LSTM(16, activation='relu', return_sequences=False)(x)
+        x = Dense(8, activation='relu')(x)
+        # Dense output layer
+        outputs = Dense(self.ytrain.shape[1], activation='softmax')(x)
+        # Compile the Model
+        model = Model(inputs, outputs)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        # Train the Model
+        model.fit(xtrain, self.ytrain, epochs=self.epochs, batch_size=8)
+        # Predict and evaluate
+        preds = model.predict(xtest)
+        pred = np.argmax(preds, axis=1)
+        metrics = main_est_parameters(self.ytest, pred)
+        return metrics
+
+    def SEL(self):
+        """
+        :return: evaluated metrics
+        """
+        cprint("<< SEL >>", color='blue', on_color='on_grey')
+        
+        xtrain = np.expand_dims(self.xtrain, axis=1)
+        xtest = np.expand_dims(self.xtest, axis=1)
+        # ensemble model
+        inputs = Input(shape=(xtrain.shape[1:]))
+        x = Conv1D(filters=16, kernel_size=3, activation='relu', padding='same')(inputs)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(1)(x)
+        x = GRU(8, activation='tanh', return_sequences=False)(x)
+        # Dense output layer
+        outputs = Dense(self.ytrain.shape[1], activation='softmax')(x)
+        # Compile the Model
+        model = Model(inputs, outputs)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        # Train the Model
+        model.fit(xtrain, self.ytrain, epochs=self.epochs, batch_size=8)
+        # Predict and evaluate
+        preds = model.predict(xtest)
+        pred = np.argmax(preds, axis=1)
+        # Placeholder for evaluation metric function
+        metrics = main_est_parameters(self.ytest, pred)
+        return metrics
+
+    def NERO(self):  # deep Variational Autoencoder CNN
+        """
+        :return: evaluated metrics
+        """
+        cprint(" << NERO >> ", color='blue', on_color='on_grey')
+        xtrain = np.expand_dims(self.xtrain, axis=-1)
+        xtest = np.expand_dims(self.xtest, axis=-1)
+
+        # Input layer
+        input_layer = Input(shape=xtrain.shape[1:])
+        # Encoder
+        x = Conv1D(32, 3, activation='relu', padding='same')(input_layer)
+        x = MaxPooling1D(1, padding='same')(x)  # Max Pooling
+        x = Conv1D(64, 3, activation='relu', padding='same')(x)
+        x = MaxPooling1D(1, padding='same')(x)
+        x = Conv1D(64, 3, activation='relu', padding='same')(x)  # Bottleneck layer
+        # decoder
+        x = Conv1D(64, 3, activation='relu', padding='same')(x)
+        x = UpSampling1D(2)(x)
+        x = Conv1D(32, 3, activation='relu', padding='same')(x)
+        x = UpSampling1D(2)(x)
+        x = Flatten()(x)
+        dense_layer = Dense(16, activation='relu')(x)
+        output_layer = Dense(self.ytrain.shape[1], activation='softmax')(dense_layer)
+        # Build autoencoder model
+        AE = Model(inputs=input_layer, outputs=output_layer)
+        AE.compile(optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
+        AE.fit(xtrain, self.ytrain, epochs=self.epochs, batch_size=8)
+        # Compile the model
+
+        # Predict and evaluate
+        preds = AE.predict(xtest)
+        pred = np.argmax(preds, axis=1)
+        # Placeholder for evaluation metric function
+        metrics = main_est_parameters(self.ytest, pred)
+        return metrics
+
+
+
+class ANALYSIS:
+    def __init__(self, Data):
+        self.lab = None
+        self.feat = None
+        self.DB = Data
+        self.E = [20, 40, 60, 80, 100]
+
+    def Data_loading(self):
+        self.feat = np.load(f'NPY\\{self.DB}_Features.npy', allow_pickle=True)
+        self.lab = np.load(f'NPY\\{self.DB}_Labels.npy', allow_pickle=True)
+
+    def TP_Analysis(self):
+        self.Data_loading()
+        # Training Percentage
+        tr = [0.4, 0.5, 0.6, 0.7, 0.8]
+        # create empty lists for storing the metrics values
+        C1, C2, C3, C4, C5, C6 = [[] for _ in range(6)]
+        # loop through training percentage
+        for i in range(len(tr)):
+            # split the data
+            xtrain, xtest, ytrain, ytest = train_test_split(np.nan_to_num(self.feat), self.lab, tr[i])
+            ytrain = keras.utils.to_categorical(ytrain)
+            COMP = Comparatives(xtrain, ytrain, xtest, ytest)
+            METHOD = PROPOSED(xtrain, ytrain, xtest, ytest)
+            # ------------------ Comparative Methods --------------------
+            C1.append(COMP.SkipGateNet())
+            C2.append(COMP.ACLR_())
+            C3.append(COMP.NERO())
+            C4.append(COMP.SEL())
+            C5.append(METHOD.Train_Test(1, self.E[4]))
+            C6.append(METHOD.Train_Test(2, self.E[4]))
+
+        comp = [C1, C2, C3, C4, C5, C6]
+        perf_names = ["ACC", "SEN", "SPE", "F1score", "PRE", "REC", "TPR", "FPR"]  # Metric names
+        file_names = [f'Analysis\\{self.DB}\\{name}_1.npy' for name in perf_names]  # file name creation
+        for j in range(0, len(perf_names)):
+            new = []
+            for i in range(len(comp)):
+                x = [separate[j] for separate in comp[i]]
+                new.append(x)
+            np.save(file_names[j], np.array(new))
+
+    def data_process(self, feat, lab, train, test):
+        tr_data = feat[train, :]
+        tr_data = tr_data[:, :]
+        ytrain = lab[train]
+        tst_data = feat[test, :]
+        tst_data = tst_data[:, :]
+        ytest = lab[test]
+        X_train = tr_data
+        X_test = tst_data
+        X_train[X_train > 1e308] = 0
+        X_test[X_test > 1e308] = 0
+        return X_train, ytrain, X_test, ytest
+
+    def KF_Analysis(self):
+        self.Data_loading()
+        # kfold - cross validation
+        kr = [6, 7, 8, 9, 10]
+        k1, k2, k3, k4, k5, k6 = [[] for _ in range(6)]
+        comp = [k1, k2, k3, k4, k5, k6]
+        self.feat = np.nan_to_num(self.feat)
+        perf_names = ["ACC", "SEN", "SPE", "F1score", "PRE", "REC", "TPR", "FPR"]  # metric names
+        for w in range(len(kr)):
+            print(colored(str(kr[w]) + " --- Fold", color='magenta'))
+            kr[w] = 2
+            strtfdKFold = StratifiedKFold(n_splits=kr[w])
+            kfold = strtfdKFold.split(self.feat, self.lab)
+            C1, C2, C3, C4, C5, C6 = [[] for _ in range(6)]
+            for k, (train, test) in enumerate(kfold):
+                xtrain, ytrain, xtest, ytest = self.data_process(self.feat, self.lab, train, test)
+                ytrain = keras.utils.to_categorical(ytrain)
+                COMP = Comparatives(xtrain, ytrain, xtest, ytest)
+                METHOD = PROPOSED(xtrain, ytrain, xtest, ytest)
+                # ------------------ Comparative Methods --------------------
+                C1.append(COMP.SkipGateNet())
+                C2.append(COMP.ACLR_())
+                C3.append(COMP.NERO())
+                C4.append(COMP.SEL())
+                C5.append(METHOD.Train_Test(0, self.E[4]))
+                C6.append(METHOD.Train_Test(1, self.E[4]))
+
+            comp01 = [C1, C2, C3, C4, C5, C6]
+            for m in range(len(comp01)):
+                new = []
+                for n in range(0, len(perf_names)):
+                    x = [separate[n] for separate in comp01[m]]
+                    x = np.mean(x)
+                    new.append(x)
+                comp[m].append(new)
+        file_names = [f'Analysis\\{self.DB}\\{name}_2.npy' for name in perf_names]  # create file names
+        for j in range(0, len(perf_names)):
+            new = []
+            for i in range(len(comp)):
+                x = [separate[j] for separate in comp[i]]
+                new.append(x)
+            np.save(file_names[j], new)
+
+    def PRC_ROC_Analysis(self):
+        self.Data_loading()
+        tr = [0.1, 0.2, 0.3, 0.9]
+        # create empty lists for storing the metrics values
+        C1, C2, C3, C4, C5, C6 = [[] for _ in range(6)]
+        # loop through training percentage
+        for i in range(len(tr)):
+            # split the data
+            xtrain, xtest, ytrain, ytest = train_test_split(np.nan_to_num(self.feat), self.lab, tr[i])
+            ytrain = keras.utils.to_categorical(ytrain)
+            COMP = Comparatives(xtrain, ytrain, xtest, ytest)
+            METHOD = PROPOSED(xtrain, ytrain, xtest, ytest)
+            # ------------------ Comparative Methods --------------------
+            C1.append(COMP.SkipGateNet())
+            C2.append(COMP.ACLR_())
+            C3.append(COMP.NERO())
+            C4.append(COMP.SEL())
+            C5.append(METHOD.Train_Test(0, self.E[4]))
+            C6.append(METHOD.Train_Test(1, self.E[4]))
+
+        comp = [C1, C2, C3, C4, C5, C6]
+        perf_names = ["pre", "rec", "tpr", "fpr"]  # Metric names
+        file_names = [f'Analysis\\{self.DB}\\{name}.npy' for name in perf_names]  # file name creation
+        for j in range(0, len(perf_names)):
+            new = []
+            for i in range(len(comp)):
+                x = [separate[j + 3] for separate in comp[i]]
+                new.append(x)
+            np.save(file_names[j], np.array(new))
+
+
+if __name__ == "__main__":
+    # Prompt with a popup dialog and store their response in choose.
+    choose = SG.PopupYesNo("Do you want complete execution ?")
+    if choose == "Yes":
+        Data_Base = ['Bot IOT']
+        for DB in Data_Base:
+            Preprocessing(DB).Preprocess()
+            ANALYSIS(DB).TP_Analysis()
+            ANALYSIS(DB).KF_Analysis()
+            ANALYSIS(DB).PRC_ROC_Analysis()
+            All_Plot(DB)
+
+    else:
+        _ALL_Graph_PLOTS_func()
